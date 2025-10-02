@@ -1,56 +1,44 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ObjectPool<T> where T : Component
+public class ObjectPool<T> where T : MonoBehaviour
 {
-    private Queue<GameObject> _pool = new Queue<GameObject>();
+    private Stack<T> _pool = new Stack<T>();
     private GameObject _prefab;
     private int _poolSize;
     private Transform _parent;
 
-    public ObjectPool(GameObject prefab, int size, Transform parent)
+    public ObjectPool(GameObject prefab, int poolSize, Transform parent)
     {
         _prefab = prefab;
-        _poolSize = size;
+        _poolSize = poolSize;
         _parent = parent;
-        InitializePool();
-    }
 
-    private void InitializePool()
-    {
         for (int i = 0; i < _poolSize; i++)
         {
-            GameObject obj = UnityEngine.Object.Instantiate(_prefab, _parent);
-            obj.transform.localScale = _prefab.transform.localScale;
-            obj.SetActive(false);
-            _pool.Enqueue(obj);
+            T obj = UnityEngine.Object.Instantiate(_prefab, _parent).GetComponent<T>();
+            obj.gameObject.SetActive(false);
+            _pool.Push(obj);
         }
     }
 
-    public GameObject GetObject()
+    public T GetObject()
     {
         if (_pool.Count > 0)
         {
-            GameObject obj = _pool.Dequeue();
-            obj.SetActive(true);
+            T obj = _pool.Pop();
+            obj.gameObject.SetActive(true);
             return obj;
         }
         return null;
     }
 
-    public void ReturnObject(GameObject obj)
+    public void ReturnObject(T obj)
     {
-        obj.SetActive(false);
-        _pool.Enqueue(obj);
-
-        var cube = obj.GetComponent<Cube>();
-        cube.SetColorChanged(false);
-        cube.SetLifeTime(0);
-        cube.SetLifeTime(0);
-        cube.GetComponent<Rigidbody>().velocity = Vector3.zero;
-    }
-    public List<GameObject> GetAllObjects()
-    {
-        return new List<GameObject>(_pool);
+        if (obj != null && obj.gameObject.activeSelf)
+        {
+            obj.gameObject.SetActive(false);
+            _pool.Push(obj);
+        }
     }
 }
