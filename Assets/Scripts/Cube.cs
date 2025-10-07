@@ -1,71 +1,71 @@
 using UnityEngine;
 
-[RequireComponent(typeof(Rigidbody), typeof(Collider))]
 public class Cube : MonoBehaviour
 {
-    private Rigidbody _rb;
-    private Collider _collider;
+    [SerializeField] private Rigidbody _rb;
+    [SerializeField] private Collider _collider;
+    [SerializeField] private ColorChanger _colorChanger;
+
+    public static event System.Action<Cube> CubeDestroyed;
+
     private bool _isActivated;
     private float _activationTime;
     private float _lifeTime;
-
-    public event System.Action<Cube> OnLifeTimeExpired;
-    public event System.Action OnFirstCollision;
+    private float _minLifeTime = 5f;
+    private float _maxLifeTime = 7f;
 
     private void Awake()
     {
-        _rb = GetComponent<Rigidbody>();
-        _collider = GetComponent<Collider>();
-        _lifeTime = Random.Range(5f, 7f);
-        Deactivate();
+        InitializeComponents();
     }
 
-    public void PrepareForSpawn(Vector3 position, Vector3 velocity)
+    private void Update()
     {
-        GetComponent<ColorChanger>()?.ResetColor();
-
-        var colorChanger = GetComponent<ColorChanger>();
-        if (colorChanger != null)
+        if (_isActivated && Time.time - _activationTime > _lifeTime)
         {
-            colorChanger.ResetColor();
+            Deactivate();
+            CubeDestroyed?.Invoke(this);
         }
-
-        transform.position = position;
-        _rb.velocity = velocity;
-        _collider.enabled = true;
-        gameObject.SetActive(true);
-        _isActivated = false;
     }
 
-    private void Activate()
+    private void OnCollisionEnter(Collision collision)
     {
+        Activate();
+        _colorChanger?.HandleFirstCollision();
+    }
+
+    private void OnDestroy()
+    {
+        CubeDestroyed = null;
+    }
+
+    public void PrepareForSpawn(float speed)
+    {
+        _isActivated = false;
+        _rb.velocity = Vector3.down * speed;
+        _colorChanger?.ResetColor();
+        _lifeTime = UnityEngine.Random.Range(_minLifeTime, _maxLifeTime);
+        _activationTime = Time.time;
+    }
+
+    public void Activate()
+    {
+        if (_isActivated) return;
         _isActivated = true;
         _activationTime = Time.time;
     }
 
     public void Deactivate()
     {
-        _rb.velocity = Vector3.zero;
-        _collider.enabled = false;
-        gameObject.SetActive(false);
+        if (!_isActivated) return;
         _isActivated = false;
+        _rb.velocity = Vector3.zero;
     }
 
-    private void Update()
+    private void InitializeComponents()
     {
-        if (_isActivated && Time.time - _activationTime >= _lifeTime)
-        {
-            Deactivate();
-            OnLifeTimeExpired?.Invoke(this);
-        }
-    }
-
-    private void OnCollisionEnter(Collision collision)
-    {
-        if (!_isActivated && !collision.collider.isTrigger)
-        {
-            Activate();
-            OnFirstCollision?.Invoke();
-        }
+        _rb = _rb != null ? _rb : GetComponent<Rigidbody>();
+        _collider = _collider != null ? _collider : GetComponent<Collider>();
+        _colorChanger = _colorChanger != null ? _colorChanger : GetComponent<ColorChanger>();
     }
 }

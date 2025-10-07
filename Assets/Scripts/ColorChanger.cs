@@ -1,63 +1,35 @@
 using UnityEngine;
 
-[RequireComponent(typeof(Cube), typeof(Renderer))]
 public class ColorChanger : MonoBehaviour
 {
-    [SerializeField] private Color _defaultColor = Color.white;
+    private Renderer _renderer;
+    private Color _originalColor;
+    private bool _hasChangedColor;
 
-    private Material _material;
-    private Cube _cube;
-    private bool _colorChanged;
-
-    private void Awake()
+    public void HandleFirstCollision()
     {
-        _cube = GetComponent<Cube>();
-        if (_cube == null)
-        {
-            Debug.LogError("Cube component missing!", this);
-            return;
-        }
+        if (_hasChangedColor) return;
 
-        Renderer renderer = GetComponent<Renderer>();
-        if (renderer == null)
-        {
-            Debug.LogError("Renderer component missing!", this);
-            return;
-        }
-
-        _material = renderer.material;
-        ResetColor();
-
-        _cube.OnFirstCollision += HandleFirstCollision;
-    }
-
-    private void HandleFirstCollision()
-    {
-        if (!_colorChanged)
-        {
-            _material.color = new Color(
-                Random.value,
-                Random.value,
-                Random.value
-            );
-            _colorChanged = true;
-        }
+        _renderer.material.color = Random.ColorHSV();
+        _hasChangedColor = true;
     }
 
     public void ResetColor()
     {
-        if (_material != null)
-        {
-            _material.color = _defaultColor;
-            _colorChanged = false;
-        }
+        _renderer.material.color = _originalColor;
+        _hasChangedColor = false;
     }
 
-    private void OnDestroy()
+    private void Awake()
     {
-        if (_cube != null)
+        _renderer = GetComponent<Renderer>();
+        if (_renderer == null)
         {
-            _cube.OnFirstCollision -= HandleFirstCollision;
+            Debug.LogError("Renderer component not found!");
+            enabled = false;
+            return;
         }
+
+        _originalColor = _renderer.material.color;
     }
 }

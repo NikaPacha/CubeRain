@@ -1,66 +1,82 @@
+using System.Collections;
 using UnityEngine;
-using System.Collections.Generic;
 
-public class PlatformSpawner : MonoBehaviour
+public class CubeSpawner : MonoBehaviour
 {
     [SerializeField] private Cube _cubePrefab;
     [SerializeField] private Transform _platform;
-    [SerializeField] private int _poolSize = 20;
-    [SerializeField] private float _spawnRate = 1f;
-    [SerializeField] private float _cubeSpeed = 10f;
-    [SerializeField] private Vector2 _heightRange = new Vector2(5f, 10f);
+    [SerializeField] private int _poolSize = 100;
+    [SerializeField] private float _spawnRate = 2f;
+    [SerializeField] private float _cubeSpeed = 5f;
+    [SerializeField] private Vector2 _heightRange = new Vector2(1f, 3f);
 
-    private Queue<Cube> _pool = new Queue<Cube>();
+    private ObjectPool<Cube> _pool;
     private BoxCollider _platformCollider;
     private float _nextSpawnTime;
 
     private void Awake()
     {
-        _platformCollider = _platform.GetComponent<BoxCollider>();
-        InitializePool();
+        if (!_platform.TryGetComponent(out BoxCollider platformCollider))
+        {
+            Debug.LogError("Платформа не имеет BoxCollider!");
+            enabled = false;
+            return;
+        }
+        _platformCollider = platformCollider;
+
+        _pool = new ObjectPool<Cube>(_cubePrefab, _poolSize, _platform);
     }
 
-    private void InitializePool()
+    private void OnEnable()
     {
-        for (int i = 0; i < _poolSize; i++)
-        {
-            Cube cube = Instantiate(_cubePrefab, transform);
-            cube.OnLifeTimeExpired += ReturnCube;
-            cube.Deactivate();
-            _pool.Enqueue(cube);
-        }
+        Cube.CubeDestroyed += OnCubeDestroyed;
+    }
+
+    private void OnDisable()
+    {
+        Cube.CubeDestroyed -= OnCubeDestroyed;
     }
 
     private void Update()
     {
-        if (Time.time >= _nextSpawnTime && _pool.Count > 0)
+        if (Time.time >= _nextSpawnTime)
         {
             SpawnCube();
-            _nextSpawnTime = Time.time + _spawnRate;
+            _nextSpawnTime = Time.time + 1f / _spawnRate;
         }
     }
 
     private void SpawnCube()
     {
-        Cube cube = _pool.Dequeue();
-        Vector3 spawnPos = CalculateSpawnPosition();
-        cube.PrepareForSpawn(spawnPos, Vector3.down * _cubeSpeed);
+        Cube cube = _pool.GetObject();
+        if (cube == null)
+        {
+            Debug.LogWarning("Нет доступных объектов в пуле!");
+            return;
+        }
+
+        Vector3 spawnPosition = CalculateSpawnPosition();
+        cube.transform.SetPositionAndRotation(spawnPosition, Quaternion.identity);
+        cube.PrepareForSpawn(_cubeSpeed);
+        cube.Activate();
     }
 
     private Vector3 CalculateSpawnPosition()
     {
         return new Vector3(
-            Random.Range(_platform.position.x - _platformCollider.size.x / 2,
-                        _platform.position.x + _platformCollider.size.x / 2),
-            Random.Range(_heightRange.x, _heightRange.y),
-            Random.Range(_platform.position.z - _platformCollider.size.z / 2,
-                        _platform.position.z + _platformCollider.size.z / 2)
-        );
+             Random.Range(_platform.position.x - _platformCollider.size.x / 2,
+                         _platform.position.x + _platformCollider.size.x / 2),
+             Random.Range(_heightRange.x, _heightRange.y),
+             Random.Range(_platform.position.z - _platformCollider.size.z / 2,
+                         _platform.position.z + _platformCollider.size.z / 2)
+         );
     }
 
-    private void ReturnCube(Cube cube)
+    private void OnCubeDestroyed(Cube cube)
     {
-        cube.Deactivate();
-        _pool.Enqueue(cube);
+        if (cube != null)
+        {
+            _pool.ReturnObject(cube);
+        }
     }
 }
