@@ -1,71 +1,72 @@
+using System;
+using System.Collections;
 using UnityEngine;
 
 public class Cube : MonoBehaviour
 {
-    [SerializeField] private Rigidbody _rb;
+    [SerializeField] private Rigidbody _rigidbody;
     [SerializeField] private Collider _collider;
     [SerializeField] private ColorChanger _colorChanger;
 
-    public static event System.Action<Cube> CubeDestroyed;
+    public event Action<Cube> OnExpired;
 
     private bool _isActivated;
-    private float _activationTime;
-    private float _lifeTime;
-    private float _minLifeTime = 5f;
+    private Coroutine _lifeTimerCoroutine;
+    private float _minLifeTime = 2f;
     private float _maxLifeTime = 7f;
-
-    private void Awake()
-    {
-        InitializeComponents();
-    }
-
-    private void Update()
-    {
-        if (_isActivated && Time.time - _activationTime > _lifeTime)
-        {
-            Deactivate();
-            CubeDestroyed?.Invoke(this);
-        }
-    }
 
     private void OnCollisionEnter(Collision collision)
     {
-        Activate();
-        _colorChanger?.HandleFirstCollision();
-    }
-
-    private void OnDestroy()
-    {
-        CubeDestroyed = null;
+        if (!_isActivated && collision.gameObject.TryGetComponent<Platform>(out _))
+        {
+            Activate();
+            _colorChanger.HandleFirstCollision();
+        }
     }
 
     public void PrepareForSpawn(float speed)
     {
         _isActivated = false;
-        _rb.velocity = Vector3.down * speed;
+
+        if (_rigidbody != null)
+        {
+            _rigidbody.velocity = Vector3.zero;
+            _rigidbody.angularVelocity = Vector3.zero;
+            _rigidbody.rotation = Quaternion.identity;
+            _rigidbody.ResetInertiaTensor();
+        }
+
+        transform.rotation = Quaternion.identity;
         _colorChanger?.ResetColor();
-        _lifeTime = UnityEngine.Random.Range(_minLifeTime, _maxLifeTime);
-        _activationTime = Time.time;
+        _rigidbody.velocity = Vector3.down * speed;
+
+        if (_lifeTimerCoroutine != null)
+        {
+            StopCoroutine(_lifeTimerCoroutine);
+            _lifeTimerCoroutine = null;
+        }
     }
 
     public void Activate()
     {
-        if (_isActivated) return;
         _isActivated = true;
-        _activationTime = Time.time;
+        float lifetime = UnityEngine.Random.Range(_minLifeTime, _maxLifeTime);
+        _lifeTimerCoroutine = StartCoroutine(LifetimeRoutine(lifetime));
+        Debug.LogError($"время пошло осталось {lifetime} секунд.");
     }
 
-    public void Deactivate()
+    private IEnumerator LifetimeRoutine(float delay)
     {
-        if (!_isActivated) return;
+        yield return new WaitForSeconds(delay);
+        OnExpired?.Invoke(this);
+        Deactivate();
+    }
+
+    private void Deactivate()
+    {
         _isActivated = false;
-        _rb.velocity = Vector3.zero;
+        _rigidbody.velocity = Vector3.zero;
     }
 
-    private void InitializeComponents()
-    {
-        _rb = _rb != null ? _rb : GetComponent<Rigidbody>();
-        _collider = _collider != null ? _collider : GetComponent<Collider>();
-        _colorChanger = _colorChanger != null ? _colorChanger : GetComponent<ColorChanger>();
-    }
+    private void OnDestroy() => OnExpired = null;
 }

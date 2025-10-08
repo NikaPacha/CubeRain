@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -7,6 +8,8 @@ public class ObjectPool<T> where T : MonoBehaviour
     private T _prefab;
     private int _poolSize;
     private Transform _parent;
+    private Func<Cube> createCube;
+    private Transform spawnParent;
 
     public ObjectPool(T prefab, int poolSize, Transform parent)
     {
@@ -23,6 +26,13 @@ public class ObjectPool<T> where T : MonoBehaviour
             obj.gameObject.SetActive(false);
             _pool.Push(obj);
         }
+    }
+
+    public ObjectPool(Func<Cube> createCube, int poolSize, Transform spawnParent)
+    {
+        this.createCube = createCube;
+        _poolSize = poolSize;
+        this.spawnParent = spawnParent;
     }
 
     private T InstantiatePrefab()
